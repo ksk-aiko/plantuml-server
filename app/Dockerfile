@@ -3,9 +3,8 @@ FROM php:8.3-cli-alpine
 
 WORKDIR /var/www/html
 
-# Added: bootstrap a minimal public entrypoint so container can start safely
-RUN mkdir -p /var/www/html/public \
-    && printf '%s\n' '<?php echo "PlantUML MVP API placeholder";' > /var/www/html/public/index.php
+# Changed: use project source as web root entrypoint
+COPY public/ /var/www/html/public/
 
 EXPOSE 8000
 
