@@ -136,6 +136,14 @@ if ($method === 'GET' && $path === '/') {
             line-height: 1.5;
             resize: vertical;
         }
+        #editor {
+            width: 100%;
+            height: 320px;
+            margin-top: 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            overflow: hidden;
+        }
         .controls {
             margin-top: 12px;
             display: flex;
@@ -205,6 +213,7 @@ if ($method === 'GET' && $path === '/') {
             <textarea id="umlInput">@startuml
 Alice -> Bob: Hello
 @enduml</textarea>
+            <div id="editor"></div>
             <div class="controls">
                 <label for="format">Format</label>
                 <select id="format">
@@ -222,12 +231,52 @@ Alice -> Bob: Hello
         </section>
     </div>
 
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
     <script>
         const umlInput = document.getElementById('umlInput');
+        const editorContainer = document.getElementById('editor');
         const format = document.getElementById('format');
         const renderBtn = document.getElementById('renderBtn');
         const result = document.getElementById('result');
         const status = document.getElementById('status');
+        let editor = null;
+
+        const initEditor = () => {
+            if (!window.require || !editorContainer) {
+                status.textContent = 'Monaco unavailable, using textarea';
+                return;
+            }
+
+            window.require.config({
+                paths: {
+                    vs: 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs'
+                }
+            });
+
+            window.require(['vs/editor/editor.main'], () => {
+                editor = window.monaco.editor.create(editorContainer, {
+                    value: umlInput.value,
+                    language: 'plaintext',
+                    theme: 'vs',
+                    minimap: { enabled: false },
+                    fontSize: 14,
+                    automaticLayout: true,
+                    lineNumbers: 'on',
+                    wordWrap: 'on'
+                });
+
+                umlInput.style.display = 'none';
+            }, () => {
+                status.textContent = 'Monaco load failed, using textarea';
+            });
+        };
+
+        const currentSource = () => {
+            if (editor) {
+                return editor.getValue();
+            }
+            return umlInput.value;
+        };
 
         const render = async () => {
             status.textContent = 'Rendering...';
@@ -237,7 +286,7 @@ Alice -> Bob: Hello
                 const res = await fetch('/api/render', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ uml: umlInput.value, format: format.value })
+                    body: JSON.stringify({ uml: currentSource(), format: format.value })
                 });
 
                 if (!res.ok) {
@@ -272,6 +321,7 @@ Alice -> Bob: Hello
         };
 
         renderBtn.addEventListener('click', render);
+        initEditor();
     </script>
 </body>
 </html>
