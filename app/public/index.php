@@ -191,6 +191,18 @@ if ($method === 'GET' && $path === '/') {
             color: var(--muted);
             font-size: 0.9rem;
         }
+        .error-box {
+            margin-top: 10px;
+            border: 1px solid #f2b8bf;
+            background: #fff1f3;
+            color: #8a1c2f;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-size: 0.9rem;
+            display: none;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
         @media (min-width: 960px) {
             .container {
                 grid-template-columns: 1fr 1fr;
@@ -224,6 +236,7 @@ Alice -> Bob: Hello
                 <button id="renderBtn" type="button">Render</button>
             </div>
             <p class="status" id="status">Ready</p>
+            <div class="error-box" id="errorBox"></div>
         </section>
 
         <section class="card">
@@ -239,7 +252,26 @@ Alice -> Bob: Hello
         const renderBtn = document.getElementById('renderBtn');
         const result = document.getElementById('result');
         const status = document.getElementById('status');
+        const errorBox = document.getElementById('errorBox');
         let editor = null;
+        let debounceTimer = null;
+        const DEBOUNCE_MS = 500;
+
+        const clearError = () => {
+            if (!errorBox) {
+                return;
+            }
+            errorBox.textContent = '';
+            errorBox.style.display = 'none';
+        };
+
+        const showError = (message) => {
+            if (!errorBox) {
+                return;
+            }
+            errorBox.textContent = message;
+            errorBox.style.display = 'block';
+        };
 
         const initEditor = () => {
             if (!window.require || !editorContainer) {
@@ -265,6 +297,9 @@ Alice -> Bob: Hello
                     wordWrap: 'on'
                 });
 
+                // Added: bind realtime render updates to Monaco input changes
+                editor.onDidChangeModelContent(scheduleRender);
+
                 umlInput.style.display = 'none';
             }, () => {
                 status.textContent = 'Monaco load failed, using textarea';
@@ -281,6 +316,7 @@ Alice -> Bob: Hello
         const render = async () => {
             status.textContent = 'Rendering...';
             result.innerHTML = '';
+            clearError();
 
             try {
                 const res = await fetch('/api/render', {
@@ -313,14 +349,26 @@ Alice -> Bob: Hello
 
                 status.textContent = 'Rendered';
             } catch (err) {
-                const pre = document.createElement('pre');
-                pre.textContent = String(err.message || err);
-                result.appendChild(pre);
+                // Changed: move render error details to dedicated error area
+                showError(String(err.message || err));
                 status.textContent = 'Failed';
             }
         };
 
+        // Added: debounce render requests for realtime preview updates
+        const scheduleRender = () => {
+            if (debounceTimer !== null) {
+                clearTimeout(debounceTimer);
+            }
+            debounceTimer = setTimeout(() => {
+                render();
+            }, DEBOUNCE_MS);
+        };
+
         renderBtn.addEventListener('click', render);
+        format.addEventListener('change', scheduleRender);
+        umlInput.addEventListener('input', scheduleRender);
+
         initEditor();
     </script>
 </body>
