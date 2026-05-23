@@ -36,7 +36,7 @@ Phase 4: 必要なら追加改善
 ### Tasks
 - [x] HTML/CSS/JavaScript の画面作成
 - [x] Monaco Editor 導入
-- [ ] PHP API 作成
+- [x] PHP API 作成
 - [ ] PlantUML Renderer 接続
 - [ ] SVG プレビュー実装
 - [ ] PNG プレビュー実装

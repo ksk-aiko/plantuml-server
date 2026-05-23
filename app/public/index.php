@@ -70,6 +70,24 @@ if ($method === 'POST' && $path === '/api/render') {
     exit;
 }
 
+if (str_starts_with($path, '/api/')) {
+    if ($method === 'GET' && $path === '/api/health') {
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode([
+            'status' => 'ok',
+            'service' => 'plantuml-mvp-api',
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    http_response_code(404);
+    header('Content-Type: application/json; charset=UTF-8');
+    echo json_encode([
+        'error' => 'api_not_found',
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if ($method === 'GET' && $path === '/') {
         header('Content-Type: text/html; charset=UTF-8');
         echo <<<'HTML'
