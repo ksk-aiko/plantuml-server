@@ -37,10 +37,10 @@ Phase 4: 必要なら追加改善
 - [x] HTML/CSS/JavaScript の画面作成
 - [x] Monaco Editor 導入
 - [x] PHP API 作成
-- [ ] PlantUML Renderer 接続
-- [ ] SVG プレビュー実装
-- [ ] PNG プレビュー実装
-- [ ] ASCII 表示実装
+- [x] PlantUML Renderer 接続
+- [x] SVG プレビュー実装
+- [x] PNG プレビュー実装
+- [x] ASCII 表示実装
 - [x] debounce によるリアルタイム更新制御
 - [x] エラー表示実装
 
