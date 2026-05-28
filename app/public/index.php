@@ -252,6 +252,7 @@ Alice -> Bob: Hello
                     <option value="txt">txt</option>
                 </select>
                 <button id="renderBtn" type="button">Render</button>
+                <button id="downloadSvgBtn" type="button">Download SVG</button>
             </div>
             <p class="status" id="status">Ready</p>
             <div class="error-box" id="errorBox"></div>
@@ -268,11 +269,13 @@ Alice -> Bob: Hello
         const editorContainer = document.getElementById('editor');
         const format = document.getElementById('format');
         const renderBtn = document.getElementById('renderBtn');
+        const downloadSvgBtn = document.getElementById('downloadSvgBtn');
         const result = document.getElementById('result');
         const status = document.getElementById('status');
         const errorBox = document.getElementById('errorBox');
         let editor = null;
         let debounceTimer = null;
+        let lastRenderedSvg = '';
         const DEBOUNCE_MS = 500;
 
         const clearError = () => {
@@ -350,9 +353,12 @@ Alice -> Bob: Hello
 
                 if (format.value === 'svg') {
                     const svg = await res.text();
+                    // Added: cache latest SVG for download action
+                    lastRenderedSvg = svg;
                     result.innerHTML = svg;
                 } else if (format.value === 'png') {
                     const blob = await res.blob();
+                    lastRenderedSvg = '';
                     const url = URL.createObjectURL(blob);
                     const img = document.createElement('img');
                     img.src = url;
@@ -360,6 +366,7 @@ Alice -> Bob: Hello
                     result.appendChild(img);
                 } else {
                     const text = await res.text();
+                    lastRenderedSvg = '';
                     const pre = document.createElement('pre');
                     pre.textContent = text;
                     result.appendChild(pre);
@@ -384,6 +391,25 @@ Alice -> Bob: Hello
         };
 
         renderBtn.addEventListener('click', render);
+        downloadSvgBtn.addEventListener('click', () => {
+            clearError();
+
+            if (!lastRenderedSvg) {
+                showError('No rendered SVG is available. Render with format=svg first.');
+                return;
+            }
+
+            // Added: trigger client-side SVG download without server-side storage
+            const blob = new Blob([lastRenderedSvg], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'diagram.svg';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        });
         format.addEventListener('change', scheduleRender);
         umlInput.addEventListener('input', scheduleRender);
 
