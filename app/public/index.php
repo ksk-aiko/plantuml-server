@@ -71,6 +71,76 @@ if ($method === 'POST' && $path === '/api/render') {
 }
 
 if (str_starts_with($path, '/api/')) {
+    if ($method === 'POST' && $path === '/api/temp-files') {
+        $rawBody = file_get_contents('php://input');
+        $payload = json_decode($rawBody !== false ? $rawBody : '', true);
+
+        if (!is_array($payload)) {
+            http_response_code(400);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['error' => 'invalid_json'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $format = strtolower((string) ($payload['format'] ?? ''));
+        $content = (string) ($payload['content'] ?? '');
+        $allowedFormats = ['svg', 'png', 'txt'];
+        if (!in_array($format, $allowedFormats, true)) {
+            http_response_code(400);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['error' => 'unsupported_format'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if ($content === '') {
+            http_response_code(400);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['error' => 'empty_content'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $fileData = $content;
+        if ($format === 'png') {
+            $decoded = base64_decode($content, true);
+            if ($decoded === false) {
+                http_response_code(400);
+                header('Content-Type: application/json; charset=UTF-8');
+                echo json_encode(['error' => 'invalid_base64_png'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            $fileData = $decoded;
+        }
+
+        $tempDir = '/tmp/plantuml_exports';
+        if (!is_dir($tempDir) && !mkdir($tempDir, 0700, true)) {
+            http_response_code(500);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['error' => 'temp_dir_create_failed'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        // Added: generate opaque filename and store file in tmp directory
+        $fileId = bin2hex(random_bytes(16));
+        $fileName = $fileId . '.' . $format;
+        $filePath = $tempDir . '/' . $fileName;
+
+        if (file_put_contents($filePath, $fileData) === false) {
+            http_response_code(500);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['error' => 'temp_file_write_failed'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode([
+            'status' => 'saved',
+            'id' => $fileId,
+            'fileName' => $fileName,
+            'bytes' => strlen($fileData),
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     if ($method === 'GET' && $path === '/api/health') {
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode([
