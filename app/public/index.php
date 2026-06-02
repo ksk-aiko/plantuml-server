@@ -254,6 +254,7 @@ Alice -> Bob: Hello
                 <button id="renderBtn" type="button">Render</button>
                 <button id="downloadSvgBtn" type="button">Download SVG</button>
                 <button id="downloadPngBtn" type="button">Download PNG</button>
+                <button id="downloadTxtBtn" type="button">Download TXT</button>
             </div>
             <p class="status" id="status">Ready</p>
             <div class="error-box" id="errorBox"></div>
@@ -272,6 +273,7 @@ Alice -> Bob: Hello
         const renderBtn = document.getElementById('renderBtn');
         const downloadSvgBtn = document.getElementById('downloadSvgBtn');
         const downloadPngBtn = document.getElementById('downloadPngBtn');
+        const downloadTxtBtn = document.getElementById('downloadTxtBtn');
         const result = document.getElementById('result');
         const status = document.getElementById('status');
         const errorBox = document.getElementById('errorBox');
@@ -279,6 +281,7 @@ Alice -> Bob: Hello
         let debounceTimer = null;
         let lastRenderedSvg = '';
         let lastRenderedPngBlob = null;
+        let lastRenderedTxt = '';
         const DEBOUNCE_MS = 500;
 
         const clearError = () => {
@@ -359,12 +362,14 @@ Alice -> Bob: Hello
                     // Added: cache latest SVG for download action
                     lastRenderedSvg = svg;
                     lastRenderedPngBlob = null;
+                    lastRenderedTxt = '';
                     result.innerHTML = svg;
                 } else if (format.value === 'png') {
                     const blob = await res.blob();
                     lastRenderedSvg = '';
                     // Added: cache latest PNG blob for download action
                     lastRenderedPngBlob = blob;
+                    lastRenderedTxt = '';
                     const url = URL.createObjectURL(blob);
                     const img = document.createElement('img');
                     img.src = url;
@@ -374,6 +379,8 @@ Alice -> Bob: Hello
                     const text = await res.text();
                     lastRenderedSvg = '';
                     lastRenderedPngBlob = null;
+                    // Added: cache latest ASCII text for download action
+                    lastRenderedTxt = text;
                     const pre = document.createElement('pre');
                     pre.textContent = text;
                     result.appendChild(pre);
@@ -430,6 +437,25 @@ Alice -> Bob: Hello
             const link = document.createElement('a');
             link.href = url;
             link.download = 'diagram.png';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        });
+        downloadTxtBtn.addEventListener('click', () => {
+            clearError();
+
+            if (!lastRenderedTxt) {
+                showError('No rendered TXT is available. Render with format=txt first.');
+                return;
+            }
+
+            // Added: trigger client-side TXT download without server-side storage
+            const blob = new Blob([lastRenderedTxt], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'diagram.txt';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
