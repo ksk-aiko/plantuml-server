@@ -253,6 +253,7 @@ Alice -> Bob: Hello
                 </select>
                 <button id="renderBtn" type="button">Render</button>
                 <button id="downloadSvgBtn" type="button">Download SVG</button>
+                <button id="downloadPngBtn" type="button">Download PNG</button>
             </div>
             <p class="status" id="status">Ready</p>
             <div class="error-box" id="errorBox"></div>
@@ -270,12 +271,14 @@ Alice -> Bob: Hello
         const format = document.getElementById('format');
         const renderBtn = document.getElementById('renderBtn');
         const downloadSvgBtn = document.getElementById('downloadSvgBtn');
+        const downloadPngBtn = document.getElementById('downloadPngBtn');
         const result = document.getElementById('result');
         const status = document.getElementById('status');
         const errorBox = document.getElementById('errorBox');
         let editor = null;
         let debounceTimer = null;
         let lastRenderedSvg = '';
+        let lastRenderedPngBlob = null;
         const DEBOUNCE_MS = 500;
 
         const clearError = () => {
@@ -355,10 +358,13 @@ Alice -> Bob: Hello
                     const svg = await res.text();
                     // Added: cache latest SVG for download action
                     lastRenderedSvg = svg;
+                    lastRenderedPngBlob = null;
                     result.innerHTML = svg;
                 } else if (format.value === 'png') {
                     const blob = await res.blob();
                     lastRenderedSvg = '';
+                    // Added: cache latest PNG blob for download action
+                    lastRenderedPngBlob = blob;
                     const url = URL.createObjectURL(blob);
                     const img = document.createElement('img');
                     img.src = url;
@@ -367,6 +373,7 @@ Alice -> Bob: Hello
                 } else {
                     const text = await res.text();
                     lastRenderedSvg = '';
+                    lastRenderedPngBlob = null;
                     const pre = document.createElement('pre');
                     pre.textContent = text;
                     result.appendChild(pre);
@@ -405,6 +412,24 @@ Alice -> Bob: Hello
             const link = document.createElement('a');
             link.href = url;
             link.download = 'diagram.svg';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        });
+        downloadPngBtn.addEventListener('click', () => {
+            clearError();
+
+            if (!lastRenderedPngBlob) {
+                showError('No rendered PNG is available. Render with format=png first.');
+                return;
+            }
+
+            // Added: trigger client-side PNG download without server-side storage
+            const url = URL.createObjectURL(lastRenderedPngBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'diagram.png';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
