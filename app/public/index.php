@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
+$MAX_UML_BYTES = 100000;
+$MAX_TEMP_CONTENT_BYTES = 2000000;
 
 if ($method === 'POST' && $path === '/api/render') {
     $rawBody = file_get_contents('php://input');
@@ -18,6 +20,14 @@ if ($method === 'POST' && $path === '/api/render') {
 
     $uml = isset($payload['uml']) ? (string) $payload['uml'] : '';
     $format = strtolower(isset($payload['format']) ? (string) $payload['format'] : 'svg');
+
+    if (strlen($uml) > $MAX_UML_BYTES) {
+        http_response_code(413);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['error' => 'uml_too_large'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     $contentTypes = [
         'svg' => 'image/svg+xml',
         'png' => 'image/png',
@@ -84,6 +94,14 @@ if (str_starts_with($path, '/api/')) {
 
         $format = strtolower((string) ($payload['format'] ?? ''));
         $content = (string) ($payload['content'] ?? '');
+
+        if (strlen($content) > $MAX_TEMP_CONTENT_BYTES) {
+            http_response_code(413);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['error' => 'content_too_large'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
         $allowedFormats = ['svg', 'png', 'txt'];
         if (!in_array($format, $allowedFormats, true)) {
             http_response_code(400);
@@ -106,6 +124,12 @@ if (str_starts_with($path, '/api/')) {
                 http_response_code(400);
                 header('Content-Type: application/json; charset=UTF-8');
                 echo json_encode(['error' => 'invalid_base64_png'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+            if (strlen($decoded) > $MAX_TEMP_CONTENT_BYTES) {
+                http_response_code(413);
+                header('Content-Type: application/json; charset=UTF-8');
+                echo json_encode(['error' => 'content_too_large'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
                 exit;
             }
             $fileData = $decoded;
