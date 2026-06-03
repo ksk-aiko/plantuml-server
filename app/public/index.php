@@ -141,6 +141,35 @@ if (str_starts_with($path, '/api/')) {
         exit;
     }
 
+    if ($method === 'DELETE' && preg_match('#^/api/temp-files/([a-f0-9]{32})$#', $path, $matches) === 1) {
+        $fileId = $matches[1];
+        $tempDir = '/tmp/plantuml_exports';
+
+        $deleted = false;
+        foreach (['svg', 'png', 'txt'] as $ext) {
+            $candidate = $tempDir . '/' . $fileId . '.' . $ext;
+            if (is_file($candidate) && unlink($candidate)) {
+                // Added: stop on first matching temp file deletion
+                $deleted = true;
+                break;
+            }
+        }
+
+        if (!$deleted) {
+            http_response_code(404);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['error' => 'temp_file_not_found'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode([
+            'status' => 'deleted',
+            'id' => $fileId,
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     if ($method === 'GET' && $path === '/api/health') {
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode([
