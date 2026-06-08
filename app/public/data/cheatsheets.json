@@ -1,0 +1,51 @@
+[
+  {
+    "id": "class-basic",
+    "title": "クラス図: 基本クラスと関連",
+    "theme": "クラス図",
+    "description": "クラス定義と関連線の最小サンプル。",
+    "uml": "@startuml\nclass User\nclass Order\nUser \"1\" -- \"many\" Order\n@enduml"
+  },
+  {
+    "id": "sequence-basic",
+    "title": "シーケンス図: メッセージ交換",
+    "theme": "シーケンス図",
+    "description": "ライフライン間の同期メッセージ例。",
+    "uml": "@startuml\nactor User\nparticipant App\nparticipant API\nUser -> App: click render\nApp -> API: POST /api/render\nAPI --> App: svg\n@enduml"
+  },
+  {
+    "id": "usecase-basic",
+    "title": "ユースケース図: 機能の俯瞰",
+    "theme": "ユースケース図",
+    "description": "アクターとユースケースの基本関係。",
+    "uml": "@startuml\nleft to right direction\nactor Learner\nrectangle PlantUMLPlatform {\n  usecase \"Render Diagram\" as UC1\n  usecase \"Download Result\" as UC2\n}\nLearner --> UC1\nLearner --> UC2\n@enduml"
+  },
+  {
+    "id": "activity-basic",
+    "title": "アクティビティ図: 処理フロー",
+    "theme": "アクティビティ図",
+    "description": "開始から分岐を含む簡易フロー。",
+    "uml": "@startuml\nstart\n:Input UML;\nif (Valid?) then (yes)\n  :Render;\nelse (no)\n  :Show error;\nendif\nstop\n@enduml"
+  },
+  {
+    "id": "state-basic",
+    "title": "状態図: エディタ状態",
+    "theme": "状態図",
+    "description": "編集中から描画完了までの状態遷移。",
+    "uml": "@startuml\n[*] --> Editing\nEditing --> Rendering : click render\nRendering --> Success : 200 OK\nRendering --> Error : 4xx/5xx\nError --> Editing : retry\nSuccess --> Editing : modify\n@enduml"
+  },
+  {
+    "id": "mindmap-basic",
+    "title": "マインドマップ: 学習項目",
+    "theme": "マインドマップ",
+    "description": "PlantUML 学習トピックの例。",
+    "uml": "@startmindmap\n* PlantUML\n** Diagram Types\n*** Class\n*** Sequence\n** API\n*** Render\n*** Download\n@endmindmap"
+  },
+  {
+    "id": "gantt-basic",
+    "title": "ガント図: MVP 作業",
+    "theme": "ガント図",
+    "description": "MVPの簡易進行イメージ。",
+    "uml": "@startgantt\nProject starts 2026-06-01\n[Core MVP] lasts 3 days\n[Download & Storage] lasts 2 days\n[Learning Features] lasts 3 days\n@endgantt"
+  }
+]
