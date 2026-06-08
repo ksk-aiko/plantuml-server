@@ -344,6 +344,34 @@ if ($method === 'GET' && $path === '/') {
             white-space: pre-wrap;
             word-break: break-word;
         }
+        .cheatsheet-list {
+            margin-top: 12px;
+            display: grid;
+            gap: 10px;
+            max-height: 340px;
+            overflow: auto;
+            padding-right: 4px;
+        }
+        .cheatsheet-item {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px;
+            background: #fbfcff;
+        }
+        .cheatsheet-title {
+            font-size: 0.95rem;
+            margin: 0 0 4px;
+        }
+        .cheatsheet-meta {
+            margin: 0 0 8px;
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+        .cheatsheet-empty {
+            color: var(--muted);
+            font-size: 0.9rem;
+            margin: 8px 0 0;
+        }
         @media (min-width: 960px) {
             .container {
                 grid-template-columns: 1fr 1fr;
@@ -386,6 +414,13 @@ Alice -> Bob: Hello
         <section class="card">
             <div class="result" id="result"></div>
         </section>
+
+        <section class="card hero">
+            <h2 class="cheatsheet-title">Cheat Sheets</h2>
+            <p class="cheatsheet-meta">図種別のサンプルを読み込み、エディタへ反映できます。</p>
+            <div class="cheatsheet-list" id="cheatsheetList"></div>
+            <p class="cheatsheet-empty" id="cheatsheetEmpty">Loading cheatsheets...</p>
+        </section>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
@@ -400,6 +435,8 @@ Alice -> Bob: Hello
         const result = document.getElementById('result');
         const status = document.getElementById('status');
         const errorBox = document.getElementById('errorBox');
+        const cheatsheetList = document.getElementById('cheatsheetList');
+        const cheatsheetEmpty = document.getElementById('cheatsheetEmpty');
         let editor = null;
         let debounceTimer = null;
         let lastRenderedSvg = '';
@@ -461,6 +498,71 @@ Alice -> Bob: Hello
                 return editor.getValue();
             }
             return umlInput.value;
+        };
+
+        const setSource = (nextSource) => {
+            if (editor) {
+                editor.setValue(nextSource);
+                return;
+            }
+            umlInput.value = nextSource;
+        };
+
+        const renderCheatsheetList = (items) => {
+            if (!cheatsheetList || !cheatsheetEmpty) {
+                return;
+            }
+
+            cheatsheetList.innerHTML = '';
+            if (!Array.isArray(items) || items.length === 0) {
+                cheatsheetEmpty.textContent = 'No cheatsheets available.';
+                return;
+            }
+
+            cheatsheetEmpty.style.display = 'none';
+
+            items.forEach((item) => {
+                const wrap = document.createElement('div');
+                wrap.className = 'cheatsheet-item';
+
+                const title = document.createElement('p');
+                title.className = 'cheatsheet-title';
+                title.textContent = item.title || 'Untitled';
+
+                const meta = document.createElement('p');
+                meta.className = 'cheatsheet-meta';
+                meta.textContent = (item.theme || 'unknown') + ' - ' + (item.description || '');
+
+                const useBtn = document.createElement('button');
+                useBtn.type = 'button';
+                useBtn.textContent = 'Use in Editor';
+                useBtn.addEventListener('click', () => {
+                    setSource(String(item.uml || ''));
+                    format.value = 'svg';
+                    render();
+                });
+
+                wrap.appendChild(title);
+                wrap.appendChild(meta);
+                wrap.appendChild(useBtn);
+                cheatsheetList.appendChild(wrap);
+            });
+        };
+
+        const loadCheatsheets = async () => {
+            try {
+                const res = await fetch('/data/cheatsheets.json');
+                if (!res.ok) {
+                    throw new Error('Failed to load cheatsheets');
+                }
+                const items = await res.json();
+                // Added: render cheatsheet entries from static JSON
+                renderCheatsheetList(items);
+            } catch (err) {
+                if (cheatsheetEmpty) {
+                    cheatsheetEmpty.textContent = 'Failed to load cheatsheets.';
+                }
+            }
         };
 
         const render = async () => {
@@ -588,6 +690,7 @@ Alice -> Bob: Hello
         umlInput.addEventListener('input', scheduleRender);
 
         initEditor();
+        loadCheatsheets();
     </script>
 </body>
 </html>
