@@ -72,7 +72,7 @@ Phase 4: 必要なら追加改善
 ### Tasks
 - [x] チートシートJSON作成
 - [x] チートシート画面作成
-- [ ] Problem JSON作成
+- [x] Problem JSON作成
 - [ ] 問題一覧ページ作成
 - [ ] 問題詳細ページ作成
 - [ ] Answer表示切替

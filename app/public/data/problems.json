@@ -1,0 +1,32 @@
+[
+  {
+    "id": 1,
+    "title": "クラス図: ユーザーと注文の関連",
+    "theme": "クラス図",
+    "uml": "@startuml\nclass User\nclass Order\nUser \"1\" -- \"many\" Order\n@enduml"
+  },
+  {
+    "id": 2,
+    "title": "シーケンス図: ログイン処理",
+    "theme": "シーケンス図",
+    "uml": "@startuml\nactor User\nparticipant Browser\nparticipant API\nUser -> Browser: submit credentials\nBrowser -> API: POST /login\nAPI --> Browser: token\n@enduml"
+  },
+  {
+    "id": 3,
+    "title": "アクティビティ図: レンダリング分岐",
+    "theme": "アクティビティ図",
+    "uml": "@startuml\nstart\n:入力を受け取る;\nif (入力が有効?) then (yes)\n  :レンダリング実行;\n  :結果を表示;\nelse (no)\n  :エラーを表示;\nendif\nstop\n@enduml"
+  },
+  {
+    "id": 4,
+    "title": "状態図: エディタの状態遷移",
+    "theme": "状態図",
+    "uml": "@startuml\n[*] --> Editing\nEditing --> Rendering : Render click\nRendering --> Success : 200 OK\nRendering --> Error : 4xx/5xx\nError --> Editing : Retry\nSuccess --> Editing : Update source\n@enduml"
+  },
+  {
+    "id": 5,
+    "title": "ライフラインの活性化",
+    "theme": "シーケンス図",
+    "uml": "@startuml\nautoactivate on\nalice -> bob : hello\nbob -> bob : self call\nbill -> bob #005500 : hello from thread 2\nbob -> george ** : create\nreturn done in thread 2\nreturn rc\nbob -> george !! : delete\nreturn success\n@enduml"
+  }
+]
