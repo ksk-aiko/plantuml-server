@@ -372,6 +372,34 @@ if ($method === 'GET' && $path === '/') {
             font-size: 0.9rem;
             margin: 8px 0 0;
         }
+        .problem-list {
+            margin-top: 12px;
+            display: grid;
+            gap: 10px;
+            max-height: 340px;
+            overflow: auto;
+            padding-right: 4px;
+        }
+        .problem-item {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px;
+            background: #fcfffb;
+        }
+        .problem-title {
+            font-size: 0.95rem;
+            margin: 0 0 4px;
+        }
+        .problem-meta {
+            margin: 0 0 8px;
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+        .problem-empty {
+            color: var(--muted);
+            font-size: 0.9rem;
+            margin: 8px 0 0;
+        }
         @media (min-width: 960px) {
             .container {
                 grid-template-columns: 1fr 1fr;
@@ -421,6 +449,13 @@ Alice -> Bob: Hello
             <div class="cheatsheet-list" id="cheatsheetList"></div>
             <p class="cheatsheet-empty" id="cheatsheetEmpty">Loading cheatsheets...</p>
         </section>
+
+        <section class="card hero">
+            <h2 class="problem-title">Practice Problems</h2>
+            <p class="problem-meta">問題一覧から選択してエディタへ反映できます。</p>
+            <div class="problem-list" id="problemList"></div>
+            <p class="problem-empty" id="problemEmpty">Loading problems...</p>
+        </section>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.52.2/min/vs/loader.min.js"></script>
@@ -437,6 +472,8 @@ Alice -> Bob: Hello
         const errorBox = document.getElementById('errorBox');
         const cheatsheetList = document.getElementById('cheatsheetList');
         const cheatsheetEmpty = document.getElementById('cheatsheetEmpty');
+        const problemList = document.getElementById('problemList');
+        const problemEmpty = document.getElementById('problemEmpty');
         let editor = null;
         let debounceTimer = null;
         let lastRenderedSvg = '';
@@ -561,6 +598,63 @@ Alice -> Bob: Hello
             } catch (err) {
                 if (cheatsheetEmpty) {
                     cheatsheetEmpty.textContent = 'Failed to load cheatsheets.';
+                }
+            }
+        };
+
+        const renderProblemList = (items) => {
+            if (!problemList || !problemEmpty) {
+                return;
+            }
+
+            problemList.innerHTML = '';
+            if (!Array.isArray(items) || items.length === 0) {
+                problemEmpty.textContent = 'No problems available.';
+                return;
+            }
+
+            problemEmpty.style.display = 'none';
+
+            items.forEach((item) => {
+                const wrap = document.createElement('div');
+                wrap.className = 'problem-item';
+
+                const title = document.createElement('p');
+                title.className = 'problem-title';
+                title.textContent = (item.id ? '#' + item.id + ' ' : '') + (item.title || 'Untitled');
+
+                const meta = document.createElement('p');
+                meta.className = 'problem-meta';
+                meta.textContent = item.theme || 'unknown';
+
+                const openBtn = document.createElement('button');
+                openBtn.type = 'button';
+                openBtn.textContent = 'Open Problem';
+                openBtn.addEventListener('click', () => {
+                    setSource(String(item.uml || ''));
+                    format.value = 'svg';
+                    render();
+                });
+
+                wrap.appendChild(title);
+                wrap.appendChild(meta);
+                wrap.appendChild(openBtn);
+                problemList.appendChild(wrap);
+            });
+        };
+
+        const loadProblems = async () => {
+            try {
+                const res = await fetch('/data/problems.json');
+                if (!res.ok) {
+                    throw new Error('Failed to load problems');
+                }
+                const items = await res.json();
+                // Added: render problem entries from static JSON
+                renderProblemList(items);
+            } catch (err) {
+                if (problemEmpty) {
+                    problemEmpty.textContent = 'Failed to load problems.';
                 }
             }
         };
@@ -691,6 +785,7 @@ Alice -> Bob: Hello
 
         initEditor();
         loadCheatsheets();
+        loadProblems();
     </script>
 </body>
 </html>
