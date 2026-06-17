@@ -400,6 +400,33 @@ if ($method === 'GET' && $path === '/') {
             font-size: 0.9rem;
             margin: 8px 0 0;
         }
+        .problem-detail {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px;
+            background: #ffffff;
+        }
+        .problem-detail h3 {
+            margin: 0 0 8px;
+            font-size: 1rem;
+        }
+        .problem-detail p {
+            margin: 0 0 6px;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+        .problem-detail pre {
+            margin: 8px 0 0;
+            max-height: 220px;
+            overflow: auto;
+            border: 1px dashed var(--border);
+            border-radius: 8px;
+            padding: 8px;
+            background: #fbfcff;
+            white-space: pre-wrap;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 12px;
+        }
         @media (min-width: 960px) {
             .container {
                 grid-template-columns: 1fr 1fr;
@@ -455,6 +482,12 @@ Alice -> Bob: Hello
             <p class="problem-meta">問題一覧から選択してエディタへ反映できます。</p>
             <div class="problem-list" id="problemList"></div>
             <p class="problem-empty" id="problemEmpty">Loading problems...</p>
+            <div class="problem-detail" id="problemDetail">
+                <h3 id="problemDetailTitle">No problem selected</h3>
+                <p id="problemDetailTheme">Theme: -</p>
+                <p id="problemDetailId">ID: -</p>
+                <pre id="problemDetailUml">Select a problem to view details.</pre>
+            </div>
         </section>
     </div>
 
@@ -480,6 +513,11 @@ Alice -> Bob: Hello
         let lastRenderedPngBlob = null;
         let lastRenderedTxt = '';
         const DEBOUNCE_MS = 500;
+
+        const problemDetailTitle = document.getElementById('problemDetailTitle');
+        const problemDetailTheme = document.getElementById('problemDetailTheme');
+        const problemDetailId = document.getElementById('problemDetailId');
+        const problemDetailUml = document.getElementById('problemDetailUml');
 
         const clearError = () => {
             if (!errorBox) {
@@ -631,16 +669,28 @@ Alice -> Bob: Hello
                 openBtn.type = 'button';
                 openBtn.textContent = 'Open Problem';
                 openBtn.addEventListener('click', () => {
+                    showProblemDetail(item);
                     setSource(String(item.uml || ''));
                     format.value = 'svg';
                     render();
                 });
-
                 wrap.appendChild(title);
                 wrap.appendChild(meta);
                 wrap.appendChild(openBtn);
                 problemList.appendChild(wrap);
             });
+        };
+
+        const showProblemDetail = (item) => {
+            if (!problemDetailTitle || !problemDetailTheme || !problemDetailId || !problemDetailUml) {
+                return;
+            }
+
+            problemDetailTitle.textContent = item.title || 'Untitled';
+            problemDetailTheme.textContent = 'Theme: ' + (item.theme || '-');
+            problemDetailId.textContent = 'ID: ' + (item.id ?? '-');
+            // Added: show selected problem UML as detail preview
+            problemDetailUml.textContent = String(item.uml || '');
         };
 
         const loadProblems = async () => {
