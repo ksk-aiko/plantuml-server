@@ -427,6 +427,17 @@ if ($method === 'GET' && $path === '/') {
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
             font-size: 12px;
         }
+        .answer-block {
+            margin-top: 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px;
+            background: #fffdf7;
+            display: none;
+        }
+        .answer-block pre {
+            margin: 0;
+        }
         @media (min-width: 960px) {
             .container {
                 grid-template-columns: 1fr 1fr;
@@ -487,6 +498,10 @@ Alice -> Bob: Hello
                 <p id="problemDetailTheme">Theme: -</p>
                 <p id="problemDetailId">ID: -</p>
                 <pre id="problemDetailUml">Select a problem to view details.</pre>
+                <button id="answerToggleBtn" type="button">Show Answer</button>
+                <div class="answer-block" id="answerBlock">
+                    <pre id="answerDetailUml">No answer available.</pre>
+                </div>
             </div>
         </section>
     </div>
@@ -518,6 +533,10 @@ Alice -> Bob: Hello
         const problemDetailTheme = document.getElementById('problemDetailTheme');
         const problemDetailId = document.getElementById('problemDetailId');
         const problemDetailUml = document.getElementById('problemDetailUml');
+        const answerToggleBtn = document.getElementById('answerToggleBtn');
+        const answerBlock = document.getElementById('answerBlock');
+        const answerDetailUml = document.getElementById('answerDetailUml');
+        let isAnswerVisible = false;
 
         const clearError = () => {
             if (!errorBox) {
@@ -691,6 +710,19 @@ Alice -> Bob: Hello
             problemDetailId.textContent = 'ID: ' + (item.id ?? '-');
             // Added: show selected problem UML as detail preview
             problemDetailUml.textContent = String(item.uml || '');
+
+            if (answerDetailUml) {
+                // Added: use problem UML as answer seed for MVP answer toggle
+                answerDetailUml.textContent = String(item.uml || 'No answer available.');
+            }
+
+            isAnswerVisible = false;
+            if (answerBlock) {
+                answerBlock.style.display = 'none';
+            }
+            if (answerToggleBtn) {
+                answerToggleBtn.textContent = 'Show Answer';
+            }
         };
 
         const loadProblems = async () => {
@@ -829,6 +861,16 @@ Alice -> Bob: Hello
             link.click();
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
+        });
+        answerToggleBtn.addEventListener('click', () => {
+            if (!answerBlock || !answerToggleBtn) {
+                return;
+            }
+
+            isAnswerVisible = !isAnswerVisible;
+            // Added: toggle answer visibility in problem detail panel
+            answerBlock.style.display = isAnswerVisible ? 'block' : 'none';
+            answerToggleBtn.textContent = isAnswerVisible ? 'Hide Answer' : 'Show Answer';
         });
         format.addEventListener('change', scheduleRender);
         umlInput.addEventListener('input', scheduleRender);
