@@ -77,7 +77,7 @@ Phase 4: 必要なら追加改善
 - [x] 問題詳細ページ作成
 - [x] Answer表示切替
 - [x] ユーザー回答と正解例の比較表示
-- [ ] Pagination追加
+- [x] Pagination追加
 
 ### Milestone
 - 問題を選び、回答と正解を比較できる

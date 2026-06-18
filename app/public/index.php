@@ -400,6 +400,17 @@ if ($method === 'GET' && $path === '/') {
             font-size: 0.9rem;
             margin: 8px 0 0;
         }
+        .problem-pager {
+            margin-top: 10px;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .problem-pager-info {
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
         .problem-detail {
             border: 1px solid var(--border);
             border-radius: 10px;
@@ -508,6 +519,11 @@ Alice -> Bob: Hello
             <p class="problem-meta">問題一覧から選択してエディタへ反映できます。</p>
             <div class="problem-list" id="problemList"></div>
             <p class="problem-empty" id="problemEmpty">Loading problems...</p>
+            <div class="problem-pager" id="problemPager">
+                <button id="problemPrevBtn" type="button">Prev</button>
+                <button id="problemNextBtn" type="button">Next</button>
+                <span class="problem-pager-info" id="problemPagerInfo">Page 1/1</span>
+            </div>
             <div class="problem-detail" id="problemDetail">
                 <h3 id="problemDetailTitle">No problem selected</h3>
                 <p id="problemDetailTheme">Theme: -</p>
@@ -541,12 +557,18 @@ Alice -> Bob: Hello
         const cheatsheetEmpty = document.getElementById('cheatsheetEmpty');
         const problemList = document.getElementById('problemList');
         const problemEmpty = document.getElementById('problemEmpty');
+        const problemPrevBtn = document.getElementById('problemPrevBtn');
+        const problemNextBtn = document.getElementById('problemNextBtn');
+        const problemPagerInfo = document.getElementById('problemPagerInfo');
         let editor = null;
         let debounceTimer = null;
         let lastRenderedSvg = '';
         let lastRenderedPngBlob = null;
         let lastRenderedTxt = '';
         const DEBOUNCE_MS = 500;
+        const PROBLEMS_PER_PAGE = 3;
+        let allProblems = [];
+        let currentProblemPage = 1;
 
         const problemDetailTitle = document.getElementById('problemDetailTitle');
         const problemDetailTheme = document.getElementById('problemDetailTheme');
@@ -680,20 +702,42 @@ Alice -> Bob: Hello
             }
         };
 
-        const renderProblemList = (items) => {
+        const updateProblemPager = () => {
+            const totalPages = Math.max(1, Math.ceil(allProblems.length / PROBLEMS_PER_PAGE));
+            if (problemPagerInfo) {
+                problemPagerInfo.textContent = `Page ${currentProblemPage}/${totalPages}`;
+            }
+            if (problemPrevBtn) {
+                problemPrevBtn.disabled = currentProblemPage <= 1;
+            }
+            if (problemNextBtn) {
+                problemNextBtn.disabled = currentProblemPage >= totalPages;
+            }
+        };
+
+        const renderProblemList = () => {
             if (!problemList || !problemEmpty) {
                 return;
             }
 
             problemList.innerHTML = '';
-            if (!Array.isArray(items) || items.length === 0) {
+            if (!Array.isArray(allProblems) || allProblems.length === 0) {
                 problemEmpty.textContent = 'No problems available.';
+                updateProblemPager();
                 return;
             }
 
             problemEmpty.style.display = 'none';
 
-            items.forEach((item) => {
+            const totalPages = Math.max(1, Math.ceil(allProblems.length / PROBLEMS_PER_PAGE));
+            if (currentProblemPage > totalPages) {
+                currentProblemPage = totalPages;
+            }
+
+            const start = (currentProblemPage - 1) * PROBLEMS_PER_PAGE;
+            const pageItems = allProblems.slice(start, start + PROBLEMS_PER_PAGE);
+
+            pageItems.forEach((item) => {
                 const wrap = document.createElement('div');
                 wrap.className = 'problem-item';
 
@@ -719,6 +763,8 @@ Alice -> Bob: Hello
                 wrap.appendChild(openBtn);
                 problemList.appendChild(wrap);
             });
+
+            updateProblemPager();
         };
 
         const showProblemDetail = (item) => {
@@ -783,8 +829,10 @@ Alice -> Bob: Hello
                     throw new Error('Failed to load problems');
                 }
                 const items = await res.json();
+                allProblems = Array.isArray(items) ? items : [];
+                currentProblemPage = 1;
                 // Added: render problem entries from static JSON
-                renderProblemList(items);
+                renderProblemList();
             } catch (err) {
                 if (problemEmpty) {
                     problemEmpty.textContent = 'Failed to load problems.';
@@ -930,6 +978,23 @@ Alice -> Bob: Hello
 
             // Added: compare current editor content with selected problem answer
             compareOutput.textContent = buildComparisonText(currentSource(), answerDetailUml.textContent);
+        });
+        problemPrevBtn.addEventListener('click', () => {
+            if (currentProblemPage <= 1) {
+                return;
+            }
+            // Added: navigate to previous problem page
+            currentProblemPage -= 1;
+            renderProblemList();
+        });
+        problemNextBtn.addEventListener('click', () => {
+            const totalPages = Math.max(1, Math.ceil(allProblems.length / PROBLEMS_PER_PAGE));
+            if (currentProblemPage >= totalPages) {
+                return;
+            }
+            // Added: navigate to next problem page
+            currentProblemPage += 1;
+            renderProblemList();
         });
         format.addEventListener('change', scheduleRender);
         umlInput.addEventListener('input', scheduleRender);
