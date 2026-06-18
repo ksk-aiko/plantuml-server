@@ -438,6 +438,21 @@ if ($method === 'GET' && $path === '/') {
         .answer-block pre {
             margin: 0;
         }
+        .compare-block {
+            margin-top: 10px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px;
+            background: #f8fbff;
+        }
+        .compare-block pre {
+            margin: 0;
+            max-height: 220px;
+            overflow: auto;
+            white-space: pre-wrap;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 12px;
+        }
         @media (min-width: 960px) {
             .container {
                 grid-template-columns: 1fr 1fr;
@@ -502,6 +517,10 @@ Alice -> Bob: Hello
                 <div class="answer-block" id="answerBlock">
                     <pre id="answerDetailUml">No answer available.</pre>
                 </div>
+                <button id="compareBtn" type="button">Compare Answer</button>
+                <div class="compare-block" id="compareBlock">
+                    <pre id="compareOutput">Comparison not run yet.</pre>
+                </div>
             </div>
         </section>
     </div>
@@ -536,6 +555,8 @@ Alice -> Bob: Hello
         const answerToggleBtn = document.getElementById('answerToggleBtn');
         const answerBlock = document.getElementById('answerBlock');
         const answerDetailUml = document.getElementById('answerDetailUml');
+        const compareBtn = document.getElementById('compareBtn');
+        const compareOutput = document.getElementById('compareOutput');
         let isAnswerVisible = false;
 
         const clearError = () => {
@@ -723,6 +744,36 @@ Alice -> Bob: Hello
             if (answerToggleBtn) {
                 answerToggleBtn.textContent = 'Show Answer';
             }
+
+            if (compareOutput) {
+                compareOutput.textContent = 'Comparison not run yet.';
+            }
+        };
+
+        const buildComparisonText = (userSource, answerSource) => {
+            const userLines = String(userSource || '').split(/\r?\n/);
+            const answerLines = String(answerSource || '').split(/\r?\n/);
+            const maxLen = Math.max(userLines.length, answerLines.length);
+            const diffs = [];
+
+            for (let i = 0; i < maxLen; i += 1) {
+                const u = userLines[i] ?? '';
+                const a = answerLines[i] ?? '';
+                if (u !== a) {
+                    diffs.push(`L${i + 1} | user: ${u}`);
+                    diffs.push(`L${i + 1} | ans : ${a}`);
+                }
+            }
+
+            if (diffs.length === 0) {
+                return 'Matched: user answer is identical to reference answer.';
+            }
+
+            return [
+                `Mismatch lines: ${diffs.length / 2}`,
+                '',
+                ...diffs
+            ].join('\n');
         };
 
         const loadProblems = async () => {
@@ -871,6 +922,14 @@ Alice -> Bob: Hello
             // Added: toggle answer visibility in problem detail panel
             answerBlock.style.display = isAnswerVisible ? 'block' : 'none';
             answerToggleBtn.textContent = isAnswerVisible ? 'Hide Answer' : 'Show Answer';
+        });
+        compareBtn.addEventListener('click', () => {
+            if (!compareOutput || !answerDetailUml) {
+                return;
+            }
+
+            // Added: compare current editor content with selected problem answer
+            compareOutput.textContent = buildComparisonText(currentSource(), answerDetailUml.textContent);
         });
         format.addEventListener('change', scheduleRender);
         umlInput.addEventListener('input', scheduleRender);
