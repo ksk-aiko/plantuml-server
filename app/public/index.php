@@ -7,11 +7,30 @@ $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $MAX_UML_BYTES = 100000;
 $MAX_TEMP_CONTENT_BYTES = 2000000;
 
+function log_app_error(string $event, array $context = []): void
+{
+    $line = json_encode([
+        'ts' => gmdate('c'),
+        'event' => $event,
+        'path' => $_SERVER['REQUEST_URI'] ?? '',
+        'method' => $_SERVER['REQUEST_METHOD'] ?? '',
+        'context' => $context,
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+    if ($line === false) {
+        return;
+    }
+
+    // Added: append structured error logs for API troubleshooting
+    @file_put_contents('/tmp/plantuml_error.log', $line . PHP_EOL, FILE_APPEND | LOCK_EX);
+}
+
 if ($method === 'POST' && $path === '/api/render') {
     $rawBody = file_get_contents('php://input');
     $payload = json_decode($rawBody !== false ? $rawBody : '', true);
 
     if (!is_array($payload)) {
+        log_app_error('render_invalid_json');
         http_response_code(400);
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['error' => 'invalid_json'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -22,6 +41,7 @@ if ($method === 'POST' && $path === '/api/render') {
     $format = strtolower(isset($payload['format']) ? (string) $payload['format'] : 'svg');
 
     if (strlen($uml) > $MAX_UML_BYTES) {
+        log_app_error('render_uml_too_large', ['bytes' => strlen($uml)]);
         http_response_code(413);
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['error' => 'uml_too_large'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -35,6 +55,7 @@ if ($method === 'POST' && $path === '/api/render') {
     ];
 
     if (!array_key_exists($format, $contentTypes)) {
+        log_app_error('render_unsupported_format', ['format' => $format]);
         http_response_code(400);
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['error' => 'unsupported_format'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -55,6 +76,7 @@ if ($method === 'POST' && $path === '/api/render') {
 
     $upstreamBody = @file_get_contents($targetUrl, false, $context);
     if ($upstreamBody === false) {
+        log_app_error('render_upstream_unreachable', ['target' => $targetUrl]);
         http_response_code(502);
         header('Content-Type: application/json; charset=UTF-8');
         echo json_encode(['error' => 'upstream_unreachable'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -86,6 +108,7 @@ if (str_starts_with($path, '/api/')) {
         $payload = json_decode($rawBody !== false ? $rawBody : '', true);
 
         if (!is_array($payload)) {
+            log_app_error('temp_files_invalid_json');
             http_response_code(400);
             header('Content-Type: application/json; charset=UTF-8');
             echo json_encode(['error' => 'invalid_json'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -96,6 +119,7 @@ if (str_starts_with($path, '/api/')) {
         $content = (string) ($payload['content'] ?? '');
 
         if (strlen($content) > $MAX_TEMP_CONTENT_BYTES) {
+            log_app_error('temp_files_content_too_large', ['bytes' => strlen($content)]);
             http_response_code(413);
             header('Content-Type: application/json; charset=UTF-8');
             echo json_encode(['error' => 'content_too_large'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -104,6 +128,7 @@ if (str_starts_with($path, '/api/')) {
 
         $allowedFormats = ['svg', 'png', 'txt'];
         if (!in_array($format, $allowedFormats, true)) {
+            log_app_error('temp_files_unsupported_format', ['format' => $format]);
             http_response_code(400);
             header('Content-Type: application/json; charset=UTF-8');
             echo json_encode(['error' => 'unsupported_format'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -111,6 +136,7 @@ if (str_starts_with($path, '/api/')) {
         }
 
         if ($content === '') {
+            log_app_error('temp_files_empty_content');
             http_response_code(400);
             header('Content-Type: application/json; charset=UTF-8');
             echo json_encode(['error' => 'empty_content'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -121,12 +147,14 @@ if (str_starts_with($path, '/api/')) {
         if ($format === 'png') {
             $decoded = base64_decode($content, true);
             if ($decoded === false) {
+                log_app_error('temp_files_invalid_base64_png');
                 http_response_code(400);
                 header('Content-Type: application/json; charset=UTF-8');
                 echo json_encode(['error' => 'invalid_base64_png'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
                 exit;
             }
             if (strlen($decoded) > $MAX_TEMP_CONTENT_BYTES) {
+                log_app_error('temp_files_content_too_large_decoded', ['bytes' => strlen($decoded)]);
                 http_response_code(413);
                 header('Content-Type: application/json; charset=UTF-8');
                 echo json_encode(['error' => 'content_too_large'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -137,6 +165,7 @@ if (str_starts_with($path, '/api/')) {
 
         $tempDir = '/tmp/plantuml_exports';
         if (!is_dir($tempDir) && !mkdir($tempDir, 0700, true)) {
+            log_app_error('temp_files_temp_dir_create_failed', ['dir' => $tempDir]);
             http_response_code(500);
             header('Content-Type: application/json; charset=UTF-8');
             echo json_encode(['error' => 'temp_dir_create_failed'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -149,6 +178,7 @@ if (str_starts_with($path, '/api/')) {
         $filePath = $tempDir . '/' . $fileName;
 
         if (file_put_contents($filePath, $fileData) === false) {
+            log_app_error('temp_files_write_failed', ['file' => $filePath]);
             http_response_code(500);
             header('Content-Type: application/json; charset=UTF-8');
             echo json_encode(['error' => 'temp_file_write_failed'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
@@ -180,6 +210,7 @@ if (str_starts_with($path, '/api/')) {
         }
 
         if (!$deleted) {
+            log_app_error('temp_files_delete_not_found', ['id' => $fileId]);
             http_response_code(404);
             header('Content-Type: application/json; charset=UTF-8');
             echo json_encode(['error' => 'temp_file_not_found'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
