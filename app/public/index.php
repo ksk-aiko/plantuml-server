@@ -6,6 +6,76 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $MAX_UML_BYTES = 100000;
 $MAX_TEMP_CONTENT_BYTES = 2000000;
+$RATE_LIMIT_WINDOW_SECONDS = 60;
+$RATE_LIMIT_MAX_REQUESTS = 30;
+
+function get_client_ip(): string
+{
+    $xff = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '';
+    if ($xff !== '') {
+        $parts = explode(',', $xff);
+        $candidate = trim((string) ($parts[0] ?? ''));
+        if ($candidate !== '') {
+            return $candidate;
+        }
+    }
+
+    $remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
+    if ($remoteAddr !== '') {
+        return $remoteAddr;
+    }
+
+    return 'unknown';
+}
+
+function check_rate_limit(string $clientIp, int $maxRequests, int $windowSeconds): bool
+{
+    $safeIp = preg_replace('/[^a-zA-Z0-9_\-:.]/', '_', $clientIp);
+    $rateFile = '/tmp/plantuml_rate_limit_' . $safeIp . '.json';
+    $now = time();
+
+    $handle = @fopen($rateFile, 'c+');
+    if ($handle === false) {
+        // Fail open if storage is not available to avoid blocking all requests.
+        return true;
+    }
+
+    if (!flock($handle, LOCK_EX)) {
+        fclose($handle);
+        return true;
+    }
+
+    $raw = stream_get_contents($handle);
+    $data = is_string($raw) && $raw !== '' ? json_decode($raw, true) : null;
+
+    $windowStart = $now;
+    $count = 0;
+
+    if (is_array($data)) {
+        $windowStart = (int) ($data['windowStart'] ?? $now);
+        $count = (int) ($data['count'] ?? 0);
+    }
+
+    if (($now - $windowStart) >= $windowSeconds) {
+        $windowStart = $now;
+        $count = 0;
+    }
+
+    $count++;
+    $allowed = $count <= $maxRequests;
+
+    rewind($handle);
+    ftruncate($handle, 0);
+    fwrite($handle, (string) json_encode([
+        'windowStart' => $windowStart,
+        'count' => $count,
+    ], JSON_UNESCAPED_SLASHES));
+    fflush($handle);
+    flock($handle, LOCK_UN);
+    fclose($handle);
+
+    return $allowed;
+}
 
 function log_app_error(string $event, array $context = []): void
 {
@@ -24,6 +94,42 @@ function log_app_error(string $event, array $context = []): void
     // Added: append structured error logs for API troubleshooting
     @file_put_contents('/tmp/plantuml_error.log', $line . PHP_EOL, FILE_APPEND | LOCK_EX);
 }
+
+function enforce_api_rate_limit(
+    string $method,
+    string $path,
+    int $maxRequests,
+    int $windowSeconds
+): void {
+    if (!str_starts_with($path, '/api/')) {
+        return;
+    }
+
+    if ($method === 'GET' && $path === '/api/health') {
+        return;
+    }
+
+    $clientIp = get_client_ip();
+    if (check_rate_limit($clientIp, $maxRequests, $windowSeconds)) {
+        return;
+    }
+
+    log_app_error('api_rate_limit_exceeded', [
+        'ip' => $clientIp,
+        'path' => $path,
+        'window_seconds' => $windowSeconds,
+        'max_requests' => $maxRequests,
+    ]);
+    http_response_code(429);
+    header('Content-Type: application/json; charset=UTF-8');
+    echo json_encode([
+        'error' => 'rate_limit_exceeded',
+        'retry_after_seconds' => $windowSeconds,
+    ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+enforce_api_rate_limit($method, $path, $RATE_LIMIT_MAX_REQUESTS, $RATE_LIMIT_WINDOW_SECONDS);
 
 if ($method === 'POST' && $path === '/api/render') {
     $rawBody = file_get_contents('php://input');
@@ -103,6 +209,7 @@ if ($method === 'POST' && $path === '/api/render') {
 }
 
 if (str_starts_with($path, '/api/')) {
+
     if ($method === 'POST' && $path === '/api/temp-files') {
         $rawBody = file_get_contents('php://input');
         $payload = json_decode($rawBody !== false ? $rawBody : '', true);
