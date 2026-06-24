@@ -11,6 +11,14 @@ $TEMP_FILE_TTL_SECONDS = 3600;
 $RATE_LIMIT_WINDOW_SECONDS = 60;
 $RATE_LIMIT_MAX_REQUESTS = 30;
 
+function apply_security_headers(): void
+{
+    header('X-Content-Type-Options: nosniff');
+    header('X-Frame-Options: DENY');
+    header('Referrer-Policy: no-referrer');
+    header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
+}
+
 function get_client_ip(): string
 {
     $xff = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '';
@@ -211,6 +219,7 @@ function build_temp_monitor_stats(string $tempDir, int $ttlSeconds): array
 }
 
 enforce_api_rate_limit($method, $path, $RATE_LIMIT_MAX_REQUESTS, $RATE_LIMIT_WINDOW_SECONDS);
+apply_security_headers();
 
 if ($method === 'POST' && $path === '/api/render') {
     $rawBody = file_get_contents('php://input');
