@@ -6,6 +6,8 @@ $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 $MAX_UML_BYTES = 100000;
 $MAX_TEMP_CONTENT_BYTES = 2000000;
+$TEMP_EXPORT_DIR = '/tmp/plantuml_exports';
+$TEMP_FILE_TTL_SECONDS = 3600;
 $RATE_LIMIT_WINDOW_SECONDS = 60;
 $RATE_LIMIT_MAX_REQUESTS = 30;
 
@@ -129,6 +131,85 @@ function enforce_api_rate_limit(
     exit;
 }
 
+function collect_temp_export_files(string $tempDir): array
+{
+    $files = [];
+    foreach (['svg', 'png', 'txt'] as $ext) {
+        $matches = glob($tempDir . '/*.' . $ext);
+        if (!is_array($matches)) {
+            continue;
+        }
+        foreach ($matches as $path) {
+            if (is_file($path)) {
+                $files[] = $path;
+            }
+        }
+    }
+
+    return $files;
+}
+
+function build_temp_monitor_stats(string $tempDir, int $ttlSeconds): array
+{
+    if (!is_dir($tempDir)) {
+        return [
+            'dir_exists' => false,
+            'temp_dir' => $tempDir,
+            'ttl_seconds' => $ttlSeconds,
+            'file_count' => 0,
+            'total_bytes' => 0,
+            'stale_file_count' => 0,
+            'oldest_file_age_seconds' => null,
+            'newest_file_age_seconds' => null,
+            'checked_at' => gmdate('c'),
+        ];
+    }
+
+    $now = time();
+    $files = collect_temp_export_files($tempDir);
+
+    $totalBytes = 0;
+    $staleCount = 0;
+    $oldestAge = null;
+    $newestAge = null;
+
+    foreach ($files as $file) {
+        $size = @filesize($file);
+        if (is_int($size) && $size > 0) {
+            $totalBytes += $size;
+        }
+
+        $mtime = @filemtime($file);
+        if (!is_int($mtime)) {
+            continue;
+        }
+
+        $age = max(0, $now - $mtime);
+        if ($age > $ttlSeconds) {
+            $staleCount++;
+        }
+
+        if ($oldestAge === null || $age > $oldestAge) {
+            $oldestAge = $age;
+        }
+        if ($newestAge === null || $age < $newestAge) {
+            $newestAge = $age;
+        }
+    }
+
+    return [
+        'dir_exists' => true,
+        'temp_dir' => $tempDir,
+        'ttl_seconds' => $ttlSeconds,
+        'file_count' => count($files),
+        'total_bytes' => $totalBytes,
+        'stale_file_count' => $staleCount,
+        'oldest_file_age_seconds' => $oldestAge,
+        'newest_file_age_seconds' => $newestAge,
+        'checked_at' => gmdate('c'),
+    ];
+}
+
 enforce_api_rate_limit($method, $path, $RATE_LIMIT_MAX_REQUESTS, $RATE_LIMIT_WINDOW_SECONDS);
 
 if ($method === 'POST' && $path === '/api/render') {
@@ -233,6 +314,12 @@ if ($method === 'POST' && $path === '/api/render') {
 }
 
 if (str_starts_with($path, '/api/')) {
+    if ($method === 'GET' && $path === '/api/temp-files/monitor') {
+        $stats = build_temp_monitor_stats($TEMP_EXPORT_DIR, $TEMP_FILE_TTL_SECONDS);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode($stats, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
 
     if ($method === 'POST' && $path === '/api/temp-files') {
         $rawBody = file_get_contents('php://input');
@@ -310,7 +397,7 @@ if (str_starts_with($path, '/api/')) {
             $fileData = $decoded;
         }
 
-        $tempDir = '/tmp/plantuml_exports';
+        $tempDir = $TEMP_EXPORT_DIR;
         if (!is_dir($tempDir) && !mkdir($tempDir, 0700, true)) {
             log_app_error('temp_files_temp_dir_create_failed', ['dir' => $tempDir]);
             http_response_code(500);
@@ -344,7 +431,7 @@ if (str_starts_with($path, '/api/')) {
 
     if ($method === 'DELETE' && preg_match('#^/api/temp-files/([a-f0-9]{32})$#', $path, $matches) === 1) {
         $fileId = $matches[1];
-        $tempDir = '/tmp/plantuml_exports';
+        $tempDir = $TEMP_EXPORT_DIR;
 
         $deleted = false;
         foreach (['svg', 'png', 'txt'] as $ext) {
