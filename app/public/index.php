@@ -143,8 +143,32 @@ if ($method === 'POST' && $path === '/api/render') {
         exit;
     }
 
-    $uml = isset($payload['uml']) ? (string) $payload['uml'] : '';
-    $format = strtolower(isset($payload['format']) ? (string) $payload['format'] : 'svg');
+    if (!array_key_exists('uml', $payload) || !is_string($payload['uml'])) {
+        log_app_error('render_invalid_uml_type', ['has_uml' => array_key_exists('uml', $payload)]);
+        http_response_code(400);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['error' => 'invalid_uml_type'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $uml = $payload['uml'];
+    if (trim($uml) === '') {
+        log_app_error('render_empty_uml');
+        http_response_code(400);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['error' => 'empty_uml'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    if (array_key_exists('format', $payload) && !is_string($payload['format'])) {
+        log_app_error('render_invalid_format_type');
+        http_response_code(400);
+        header('Content-Type: application/json; charset=UTF-8');
+        echo json_encode(['error' => 'invalid_format_type'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $format = strtolower(trim((string) ($payload['format'] ?? 'svg')));
 
     if (strlen($uml) > $MAX_UML_BYTES) {
         log_app_error('render_uml_too_large', ['bytes' => strlen($uml)]);
@@ -222,8 +246,24 @@ if (str_starts_with($path, '/api/')) {
             exit;
         }
 
-        $format = strtolower((string) ($payload['format'] ?? ''));
-        $content = (string) ($payload['content'] ?? '');
+        if (!array_key_exists('format', $payload) || !is_string($payload['format'])) {
+            log_app_error('temp_files_invalid_format_type', ['has_format' => array_key_exists('format', $payload)]);
+            http_response_code(400);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['error' => 'invalid_format_type'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        if (!array_key_exists('content', $payload) || !is_string($payload['content'])) {
+            log_app_error('temp_files_invalid_content_type', ['has_content' => array_key_exists('content', $payload)]);
+            http_response_code(400);
+            header('Content-Type: application/json; charset=UTF-8');
+            echo json_encode(['error' => 'invalid_content_type'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+
+        $format = strtolower(trim($payload['format']));
+        $content = $payload['content'];
 
         if (strlen($content) > $MAX_TEMP_CONTENT_BYTES) {
             log_app_error('temp_files_content_too_large', ['bytes' => strlen($content)]);
@@ -242,7 +282,7 @@ if (str_starts_with($path, '/api/')) {
             exit;
         }
 
-        if ($content === '') {
+        if (trim($content) === '') {
             log_app_error('temp_files_empty_content');
             http_response_code(400);
             header('Content-Type: application/json; charset=UTF-8');
